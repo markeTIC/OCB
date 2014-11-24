@@ -1572,7 +1572,19 @@ instance.web.search.DateField = instance.web.search.Field.extend(/** @lends inst
         return instance.web.date_to_str(facetValue.get('value'));
     },
     complete: function (needle) {
-        var d = Date.parse(needle);
+        var d;
+        try {
+            var t = (this.attrs && this.attrs.type === 'datetime') ? 'datetime' : 'date';
+            var v = instance.web.parse_value(needle, {'widget': t});
+            if (t === 'datetime'){
+                d = instance.web.str_to_datetime(v);
+            }
+            else{
+                d = instance.web.str_to_date(v);
+            }
+        } catch (e) {
+            // pass
+        }
         if (!d) { return $.when(null); }
         var date_string = instance.web.format_value(d, this.attrs);
         var label = _.str.sprintf(_.str.escapeHTML(
@@ -2350,6 +2362,12 @@ instance.web.search.AutoComplete = instance.web.Widget.extend({
                 ev.preventDefault();
                 return;
             }
+            if (ev.which === $.ui.keyCode.ENTER) {
+                if (self.current_result && self.get_search_string().length) {
+                    self.select_item(ev);
+                }
+                return;
+            }
             if (!self.searching) {
                 self.searching = true;
                 return;
@@ -2365,7 +2383,6 @@ instance.web.search.AutoComplete = instance.web.Widget.extend({
         this.$input.on('keydown', function (ev) {
             switch (ev.which) {
                 case $.ui.keyCode.TAB:
-                case $.ui.keyCode.ENTER:
                     if (self.current_result && self.get_search_string().length) {
                         self.select_item(ev);
                     }
