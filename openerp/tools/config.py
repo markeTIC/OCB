@@ -203,7 +203,7 @@ class configmanager(object):
         ]
         group.add_option('--log-level', dest='log_level', type='choice',
                          choices=levels, my_default='info',
-                         help='specify the level of the logging. Accepted values: %s (deprecated option).' % (levels,))
+                         help='specify the level of the logging. Accepted values: %s.' % (levels,))
 
         parser.add_option_group(group)
 
@@ -460,7 +460,7 @@ class configmanager(object):
             self.options['addons_path'] = ','.join(default_addons)
         else:
             self.options['addons_path'] = ",".join(
-                    os.path.abspath(os.path.expanduser(os.path.expandvars(x)))
+                    os.path.abspath(os.path.expanduser(os.path.expandvars(x.strip())))
                       for x in self.options['addons_path'].split(','))
 
         self.options['init'] = opt.init and dict.fromkeys(opt.init.split(','), 1) or {}

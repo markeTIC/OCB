@@ -4412,7 +4412,7 @@ instance.web.form.One2ManyListView = instance.web.ListView.extend({
             r = record;
             _.each(self.editor.form.fields, function(field){
                 field._inhibit_on_change_flag = true;
-                field.set_value(r.attributes[field.name]);
+                field.internal_set_value(r.attributes[field.name]);
                 field._inhibit_on_change_flag = false;
             });
             return _.every(self.editor.form.fields, function(field){
@@ -5348,19 +5348,23 @@ instance.web.form.SelectCreatePopup = instance.web.form.AbstractFormPopup.extend
                 contexts: [this.context]
             }).done(function (results) {
                 var search_defaults = {};
+                var options = {};
                 _.each(results.context, function (value_, key) {
                     var match = /^search_default_(.*)$/.exec(key);
                     if (match) {
                         search_defaults[match[1]] = value_;
                     }
+                    if (key === 'search_disable_custom_filters'){
+                        options['disable_custom_filters'] = value_;
+                    }
                 });
-                self.setup_search_view(search_defaults);
+                self.setup_search_view(search_defaults, options);
             });
         } else { // "form"
             this.new_object();
         }
     },
-    setup_search_view: function(search_defaults) {
+    setup_search_view: function(search_defaults, options) {
         var self = this;
         if (this.searchview) {
             this.searchview.destroy();
@@ -5369,7 +5373,7 @@ instance.web.form.SelectCreatePopup = instance.web.form.AbstractFormPopup.extend
             this.searchview_drawer.destroy();
         }
         this.searchview = new instance.web.SearchView(this,
-                this.dataset, false,  search_defaults);
+                this.dataset, false,  search_defaults, options);
         this.searchview_drawer = new instance.web.SearchViewDrawer(this, this.searchview);
         this.searchview.on('search_data', self, function(domains, contexts, groupbys) {
             if (self.initial_ids) {
