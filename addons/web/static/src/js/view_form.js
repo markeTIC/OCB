@@ -4379,6 +4379,10 @@ instance.web.form.One2ManyViewManager = instance.web.ViewManager.extend({
 instance.web.form.One2ManyDataSet = instance.web.BufferedDataSet.extend({
     get_context: function() {
         this.context = this.o2m.build_context();
+        var self = this;
+        _.each(arguments, function(context) {
+            self.context.add(context);
+        });
         return this.context;
     }
 });
@@ -5643,14 +5647,17 @@ instance.web.form.FieldBinary = instance.web.form.AbstractField.extend(instance.
         } else {
             instance.web.blockUI();
             var c = instance.webclient.crashmanager;
+            var filename_fieldname = this.node.attrs.filename;
+            var filename_field = this.view.fields && this.view.fields[filename_fieldname];
             this.session.get_file({
                 url: '/web/binary/saveas_ajax',
                 data: {data: JSON.stringify({
                     model: this.view.dataset.model,
                     id: (this.view.datarecord.id || ''),
                     field: this.name,
-                    filename_field: (this.node.attrs.filename || ''),
+                    filename_field: (filename_fieldname || ''),
                     data: instance.web.form.is_bin_size(value) ? null : value,
+                    filename: filename_field ? filename_field.get('value') : null,
                     context: this.view.dataset.get_context()
                 })},
                 complete: instance.web.unblockUI,
