@@ -31,6 +31,13 @@ class stock_move(osv.osv):
             readonly=True),
     }
 
+    def get_price_unit(self, cr, uid, move, context=None):
+        """ Returns the unit price to store on the quant """
+        if move.purchase_line_id:
+            return move.price_unit
+
+        return super(stock_move, self).get_price_unit(cr, uid, move, context=context)
+
     def write(self, cr, uid, ids, vals, context=None):
         if isinstance(ids, (int, long)):
             ids = [ids]
@@ -73,7 +80,7 @@ class stock_move(osv.osv):
             purchase_obj = self.pool.get('purchase.order')
             invoice_line_obj = self.pool.get('account.invoice.line')
             purchase_id = move.purchase_line_id.order_id.id
-            purchase_line_ids = purchase_line_obj.search(cr, uid, [('order_id', '=', purchase_id), ('product_id.type', '=', 'service'), ('invoice_lines', '=', False)], context=context)
+            purchase_line_ids = purchase_line_obj.search(cr, uid, [('order_id', '=', purchase_id), ('invoice_lines', '=', False), '|', ('product_id', '=', False), ('product_id.type', '=', 'service')], context=context)
             if purchase_line_ids:
                 inv_lines = []
                 for po_line in purchase_line_obj.browse(cr, uid, purchase_line_ids, context=context):
@@ -117,6 +124,13 @@ class stock_move(osv.osv):
         """
             Attribute price to move, important in inter-company moves or receipts with only one partner
         """
+        # The method attribute_price of the parent class sets the price to the standard product
+        # price if move.price_unit is zero. We don't want this behavior in the case of a purchase
+        # order since we can purchase goods which are free of charge (e.g. 5 units offered if 100
+        # are purchased).
+        if move.purchase_line_id:
+            return
+
         code = self.get_code_from_locs(cr, uid, move, context=context)
         if not move.purchase_line_id and code == 'incoming' and not move.price_unit:
             partner = move.picking_id and move.picking_id.partner_id or False
