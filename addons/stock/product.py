@@ -24,6 +24,7 @@ from openerp.tools.translate import _
 from openerp.tools.safe_eval import safe_eval as eval
 import openerp.addons.decimal_precision as dp
 from openerp.tools.float_utils import float_round
+from openerp.exceptions import except_orm
 
 class product_product(osv.osv):
     _inherit = "product.product"
@@ -137,20 +138,21 @@ class product_product(osv.osv):
         domain_move_in += self._get_domain_dates(cr, uid, ids, context=context) + [('state', 'not in', ('done', 'cancel', 'draft'))] + domain_products
         domain_move_out += self._get_domain_dates(cr, uid, ids, context=context) + [('state', 'not in', ('done', 'cancel', 'draft'))] + domain_products
         domain_quant += domain_products
-        if context.get('lot_id') or context.get('owner_id') or context.get('package_id'):
-            if context.get('lot_id'):
-                domain_quant.append(('lot_id', '=', context['lot_id']))
-            if context.get('owner_id'):
-                domain_quant.append(('owner_id', '=', context['owner_id']))
-            if context.get('package_id'):
-                domain_quant.append(('package_id', '=', context['package_id']))
-            moves_in = []
-            moves_out = []
-        else:
-            domain_move_in += domain_move_in_loc
-            domain_move_out += domain_move_out_loc
-            moves_in = self.pool.get('stock.move').read_group(cr, uid, domain_move_in, ['product_id', 'product_qty'], ['product_id'], context=context)
-            moves_out = self.pool.get('stock.move').read_group(cr, uid, domain_move_out, ['product_id', 'product_qty'], ['product_id'], context=context)
+
+        if context.get('lot_id'):
+            domain_quant.append(('lot_id', '=', context['lot_id']))
+        if context.get('owner_id'):
+            domain_quant.append(('owner_id', '=', context['owner_id']))
+            owner_domain = ('restrict_partner_id', '=', context['owner_id'])
+            domain_move_in.append(owner_domain)
+            domain_move_out.append(owner_domain)
+        if context.get('package_id'):
+            domain_quant.append(('package_id', '=', context['package_id']))
+
+        domain_move_in += domain_move_in_loc
+        domain_move_out += domain_move_out_loc
+        moves_in = self.pool.get('stock.move').read_group(cr, uid, domain_move_in, ['product_id', 'product_qty'], ['product_id'], context=context)
+        moves_out = self.pool.get('stock.move').read_group(cr, uid, domain_move_out, ['product_id', 'product_qty'], ['product_id'], context=context)
 
         domain_quant += domain_quant_loc
         quants = self.pool.get('stock.quant').read_group(cr, uid, domain_quant, ['product_id', 'qty'], ['product_id'], context=context)
@@ -278,7 +280,9 @@ class product_product(osv.osv):
     }
 
     def fields_view_get(self, cr, uid, view_id=None, view_type='form', context=None, toolbar=False, submenu=False):
-        res = super(product_product,self).fields_view_get(cr, uid, view_id, view_type, context, toolbar=toolbar, submenu=submenu)
+        res = super(product_product, self).fields_view_get(
+            cr, uid, view_id=view_id, view_type=view_type, context=context,
+            toolbar=toolbar, submenu=submenu)
         if context is None:
             context = {}
         if ('location' in context) and context['location']:
@@ -478,6 +482,16 @@ class product_template(osv.osv):
             result['domain'] = "[('product_id','in',[" + ','.join(map(str, products)) + "])]"
             result['context'] = "{'tree_view_ref':'stock.view_move_tree'}"
         return result
+
+    def write(self, cr, uid, ids, vals, context=None):
+        if 'uom_id' in vals:
+            new_uom = self.pool.get('product.uom').browse(cr, uid, vals['uom_id'], context=context)
+            for product in self.browse(cr, uid, ids, context=context):
+                old_uom = product.uom_id
+                if old_uom != new_uom:
+                    if self.pool.get('stock.move').search(cr, uid, [('product_id', 'in', [x.id for x in product.product_variant_ids]), ('state', '=', 'done')], limit=1, context=context):
+                        raise except_orm(_('Warning'), _("You can not change the unit of measure of a product that has already been used in a done stock move. If you need to change the unit of measure, you may deactivate this product."))
+        return super(product_template, self).write(cr, uid, ids, vals, context=context)
 
 
 class product_removal_strategy(osv.osv):
