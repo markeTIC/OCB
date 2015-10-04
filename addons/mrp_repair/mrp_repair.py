@@ -285,7 +285,7 @@ class mrp_repair(osv.osv):
             else:
                 self.write(cr, uid, [o.id], {'state': 'confirmed'})
                 for line in o.operations:
-                    if line.product_id.track_production:
+                    if line.product_id.track_production and not line.lot_id:
                         raise osv.except_osv(_('Warning!'), _("Serial number is required for operation line with product '%s'") % (line.product_id.name))
                 mrp_line_obj.write(cr, uid, [l.id for l in o.operations], {'state': 'confirmed'})
         return True
@@ -473,6 +473,7 @@ class mrp_repair(osv.osv):
                     'partner_id': repair.address_id and repair.address_id.id or False,
                     'location_id': move.location_id.id,
                     'location_dest_id': move.location_dest_id.id,
+                    'origin': repair.name
                 })
                 move_ids.append(move_id)
                 repair_line_obj.write(cr, uid, [move.id], {'move_id': move_id, 'state': 'done'}, context=context)

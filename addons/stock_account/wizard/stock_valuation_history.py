@@ -1,4 +1,5 @@
 
+from datetime import datetime
 from openerp import tools
 from openerp.osv import fields, osv
 from openerp.tools.translate import _
@@ -45,7 +46,7 @@ class stock_history(osv.osv):
         res = super(stock_history, self).read_group(cr, uid, domain, fields, groupby, offset=offset, limit=limit, context=context, orderby=orderby, lazy=lazy)
         if context is None:
             context = {}
-        date = context.get('history_date')
+        date = context.get('history_date', datetime.now())
         if 'inventory_value' in fields:
             group_lines = {}
             for line in res:
@@ -65,8 +66,10 @@ class stock_history(osv.osv):
             products_rec = self.pool['product.product'].read(cr, uid, product_ids, ['cost_method', 'product_tmpl_id'], context=context)
             products_dict = dict((product['id'], product) for product in products_rec)
             cost_method_product_tmpl_ids = list(set(product['product_tmpl_id'][0] for product in products_rec if product['cost_method'] != 'real'))
-            cr.execute('SELECT DISTINCT ON (product_template_id, company_id) product_template_id, company_id, cost FROM product_price_history WHERE product_template_id in %s AND datetime <= %s ORDER BY product_template_id, company_id, datetime DESC', (tuple(cost_method_product_tmpl_ids), date))
-            histories = cr.dictfetchall()
+            histories = []
+            if cost_method_product_tmpl_ids:
+                cr.execute('SELECT DISTINCT ON (product_template_id, company_id) product_template_id, company_id, cost FROM product_price_history WHERE product_template_id in %s AND datetime <= %s ORDER BY product_template_id, company_id, datetime DESC', (tuple(cost_method_product_tmpl_ids), date))
+                histories = cr.dictfetchall()
             histories_dict = {}
             for history in histories:
                 histories_dict[(history['product_template_id'], history['company_id'])] = history['cost']
@@ -148,8 +151,11 @@ class stock_history(osv.osv):
                 LEFT JOIN
                     product_template ON product_template.id = product_product.product_tmpl_id
                 WHERE quant.qty>0 AND stock_move.state = 'done' AND dest_location.usage in ('internal', 'transit') AND stock_quant_move_rel.quant_id = quant.id
-                AND stock_quant_move_rel.move_id = stock_move.id AND ((source_location.company_id is null and dest_location.company_id is not null) or
-                (source_location.company_id is not null and dest_location.company_id is null) or source_location.company_id != dest_location.company_id)
+                AND stock_quant_move_rel.move_id = stock_move.id AND (
+                    (source_location.company_id is null and dest_location.company_id is not null) or
+                    (source_location.company_id is not null and dest_location.company_id is null) or
+                    source_location.company_id != dest_location.company_id or
+                    source_location.usage not in ('internal', 'transit'))
                 ) UNION
                 (SELECT
                     '-' || stock_move.id::text || '-' || quant.id::text AS id,
@@ -174,8 +180,11 @@ class stock_history(osv.osv):
                 LEFT JOIN
                     product_template ON product_template.id = product_product.product_tmpl_id
                 WHERE quant.qty>0 AND stock_move.state = 'done' AND source_location.usage in ('internal', 'transit') AND stock_quant_move_rel.quant_id = quant.id
-                AND stock_quant_move_rel.move_id = stock_move.id AND ((dest_location.company_id is null and source_location.company_id is not null) or
-                (dest_location.company_id is not null and source_location.company_id is null) or dest_location.company_id != source_location.company_id)
+                AND stock_quant_move_rel.move_id = stock_move.id AND (
+                    (dest_location.company_id is null and source_location.company_id is not null) or
+                    (dest_location.company_id is not null and source_location.company_id is null) or
+                    dest_location.company_id != source_location.company_id or
+                    dest_location.usage not in ('internal', 'transit'))
                 ))
                 AS foo
                 GROUP BY move_id, location_id, company_id, product_id, product_categ_id, date, price_unit_on_quant, source

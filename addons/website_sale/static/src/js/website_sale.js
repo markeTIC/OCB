@@ -21,9 +21,9 @@ $('.oe_website_sale').each(function () {
 
     $(oe_website_sale).on("change", 'input[name="add_qty"]', function (event) {
         product_ids = [];
-        var product_dom = $("ul.js_add_cart_variants[data-attribute_value_ids]").first();
+        var product_dom = $(".js_add_cart_variants[data-attribute_value_ids]").first();
         product_dom.data("attribute_value_ids").forEach(function(entry) {
-            product_ids.push(entry[0]);});
+            product_ids.push(entry);});
         var qty = $(event.target).closest('form').find('input[name="add_qty"]').val();
 
         openerp.jsonRpc("/shop/get_unit_price", 'call', {'product_ids': product_ids,'add_qty': parseInt(qty)})
@@ -44,7 +44,6 @@ $('.oe_website_sale').each(function () {
     $(oe_website_sale).find(".oe_cart input.js_quantity").on("change", function () {
         var $input = $(this);
         if ($input.data('update_change')) {
-            console.log($input.val()+ "+++");
             return;
         }
         var value = parseInt($input.val(), 10);
@@ -81,12 +80,11 @@ $('.oe_website_sale').each(function () {
             .then(function (data) {
                 $input.data('update_change', false);
                 if (value !== parseInt($input.val(), 10)) {
-                    console.log($input.val()+ "***");
                     $input.trigger('change');
                     return;
                 }
                 if (!data.quantity) {
-                    location.reload();
+                    location.reload(true);
                     return;
                 }
                 var $q = $(".my_cart_quantity");
@@ -154,7 +152,7 @@ $('.oe_website_sale').each(function () {
     });
 
     $(oe_website_sale).on('change', 'input.js_variant_change, select.js_variant_change, ul[data-attribute_value_ids]', function (ev) {
-        var $ul = $(ev.target).closest('ul.js_add_cart_variants');
+        var $ul = $(ev.target).closest('.js_add_cart_variants');
         var $parent = $ul.closest('.js_product');
         var $product_id = $parent.find('input.product_id').first();
         var $price = $parent.find(".oe_price:first .oe_currency_value");
@@ -220,7 +218,12 @@ $('.oe_website_sale').each(function () {
             $parent.find(".js_check_product").attr("disabled", "disabled");
         }
     });
-    $('ul.js_add_cart_variants', oe_website_sale).each(function () {
+
+    $('div.js_product', oe_website_sale).each(function () {
+        $('input.js_product_change', this).first().trigger('change');
+    });
+
+    $('.js_add_cart_variants', oe_website_sale).each(function () {
         $('input.js_variant_change, select.js_variant_change', this).first().trigger('change');
     });
 

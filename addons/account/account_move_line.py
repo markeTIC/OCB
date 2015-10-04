@@ -589,7 +589,8 @@ class account_move_line(osv.osv):
         res = super(account_move_line, self)._auto_init(cr, context=context)
         cr.execute('SELECT indexname FROM pg_indexes WHERE indexname = \'account_move_line_journal_id_period_id_index\'')
         if not cr.fetchone():
-            cr.execute('CREATE INDEX account_move_line_journal_id_period_id_index ON account_move_line (journal_id, period_id)')
+            cr.execute('CREATE INDEX account_move_line_journal_id_period_id_index '
+                       'ON account_move_line (journal_id, period_id, state, create_uid, id DESC)')
         cr.execute('SELECT indexname FROM pg_indexes WHERE indexname = %s', ('account_move_line_date_id_index',))
         if not cr.fetchone():
             cr.execute('CREATE INDEX account_move_line_date_id_index ON account_move_line (date DESC, id desc)')
@@ -835,9 +836,9 @@ class account_move_line(osv.osv):
                 ret_line['credit_currency'] = actual_credit
                 ret_line['debit_currency'] = actual_debit
                 if target_currency == company_currency:
-                    actual_debit = debit
-                    actual_credit = credit
-                    total_amount = debit or credit
+                    actual_debit = debit > 0 and amount or 0.0
+                    actual_credit = credit > 0 and amount or 0.0
+                    total_amount = abs(debit - credit)
                 else:
                     ctx = context.copy()
                     ctx.update({'date': line.date})
